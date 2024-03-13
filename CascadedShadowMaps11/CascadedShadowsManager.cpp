@@ -453,6 +453,7 @@ HRESULT CascadedShadowsManager::ReleaseAndAllocateNewShadowResources( ID3D11Devi
 // This function takes the camera's projection matrix and returns the 8
 // points that make up a view frustum.
 // The frustum is scaled to fit within the Begin and End interval paramaters.
+// 根据NDC和vProj可以推算整个Frustum的形状，再带入n,f就可以求出世界坐标系的frustum 8个点坐标
 //--------------------------------------------------------------------------------------
 void CascadedShadowsManager::CreateFrustumPointsFromCascadeInterval( float fCascadeIntervalBegin, 
                                                         FLOAT fCascadeIntervalEnd, 
@@ -812,6 +813,8 @@ HRESULT CascadedShadowsManager::InitFrame ( ID3D11Device* pd3dDevice )
     XMFLOAT3 tmp[8];
     bb.GetCorners( tmp );
 
+    // world space to light space
+    
     // Transform the scene AABB to Light space.
     XMVECTOR vSceneAABBPointsLightSpace[8];
     for( int index =0; index < 8; ++index ) 
@@ -850,6 +853,8 @@ HRESULT CascadedShadowsManager::InitFrame ( ID3D11Device* pd3dDevice )
         fFrustumIntervalEnd = (FLOAT)m_iCascadePartitionsZeroToOne[ iCascadeIndex ];        
         fFrustumIntervalBegin/= (FLOAT)m_iCascadePartitionsMax;
         fFrustumIntervalEnd/= (FLOAT)m_iCascadePartitionsMax;
+        // 这里先把interval转成[0,1]之间的比例
+        // 再根据viewcamear的near/far距离计算在view space中的实际距离
         fFrustumIntervalBegin = fFrustumIntervalBegin * fCameraNearFarRange;
         fFrustumIntervalEnd = fFrustumIntervalEnd * fCameraNearFarRange;
         XMVECTOR vFrustumPoints[8];
@@ -862,6 +867,9 @@ HRESULT CascadedShadowsManager::InitFrame ( ID3D11Device* pd3dDevice )
         vLightCameraOrthographicMin = g_vFLTMAX;
         vLightCameraOrthographicMax = g_vFLTMIN;
 
+        
+        // 把frustum转到light space后计算一个AABB
+        
         XMVECTOR vTempTranslatedCornerPoint;
         // This next section of code calculates the min and max values for the orthographic projection.
         for( int icpIndex=0; icpIndex < 8; ++icpIndex ) 
@@ -884,6 +892,7 @@ HRESULT CascadedShadowsManager::InitFrame ( ID3D11Device* pd3dDevice )
             // 
             // To do this, we pad the ortho transform so that it is always big enough to cover 
             // the entire camera view frustum.
+            // 此时已经在World Space
             XMVECTOR vDiagonal = vFrustumPoints[0] - vFrustumPoints[6];
             vDiagonal = XMVector3Length( vDiagonal );
             
